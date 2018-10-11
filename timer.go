@@ -9,7 +9,7 @@ type mockTimer struct {
 	release chan bool
 
 	lock   chan struct{}
-	clock  Clock
+	clock  *MockClock
 	active bool
 	target time.Time
 }
@@ -28,9 +28,9 @@ func (m *mockTimer) setInactive() {
 	m.active = false
 }
 
-func (m *mockTimer) wait() {
+func (m *mockTimer) wait(now time.Time) {
 	select {
-	case <-m.clock.After(m.target.Sub(m.clock.Now())):
+	case <-m.clock.after(now, m.target.Sub(now)):
 		m.setInactive()
 		m.c <- m.clock.Now()
 	case <-m.release:
@@ -46,13 +46,14 @@ func (m *mockTimer) Reset(d time.Duration) bool {
 	m.lock <- struct{}{}
 	defer func() { <-m.lock }()
 
+	now := m.clock.Now()
 	wasActive, m.active = m.active, true
-	m.target = m.clock.Now().Add(d)
+	m.target = now.Add(d)
 
 	if wasActive {
 		m.release <- true
 	}
-	go m.wait()
+	go m.wait(now)
 
 	return wasActive
 }
@@ -72,7 +73,7 @@ func (m *mockTimer) Stop() bool {
 
 // NewMockTimer creates a new Timer using the provided Clock. You should not use this
 // directly outside of unit tests; use Clock.NewTimer().
-func NewMockTimer(c Clock) Timer {
+func NewMockTimer(c *MockClock) Timer {
 	return &mockTimer{
 		c:       make(chan time.Time, 1),
 		release: make(chan bool),

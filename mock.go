@@ -27,8 +27,12 @@ func (m *MockClock) Now() time.Time {
 
 // After waits for the duration to elapse and then sends the current time on the returned channel.
 func (m *MockClock) After(d time.Duration) <-chan time.Time {
+	return m.after(m.Now(), d)
+}
+
+func (m *MockClock) after(now time.Time, d time.Duration) <-chan time.Time {
 	ch := make(chan time.Time, 1)
-	target := m.Now().Add(d)
+	target := now.Add(d)
 
 	go func() {
 		for {
